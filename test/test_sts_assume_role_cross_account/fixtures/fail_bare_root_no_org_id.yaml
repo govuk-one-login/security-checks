@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  FAIL: trust policy trusts an entire account root for sts:AssumeRole with a
+  condition that is not aws:PrincipalOrgID. Trusting :root without an
+  org-boundary condition is not sufficient.
+Resources:
+  BareRootTrustRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::111122223333:root"
+            Action: "sts:AssumeRole"
+            Condition:
+              Bool:
+                aws:SecureTransport: "true"
