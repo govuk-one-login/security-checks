@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: govuk-one-login/devplatform-demo-sam-app
-          ref: main
+          ref: PSREDEV-3741
           fetch-depth: 0
           token: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
 
@@ -35,28 +35,7 @@ jobs:
 
           echo "# feature-test-${{ github.run_id }}" >> sam-app/template.yaml
 
-          REF="${{ github.head_ref || github.ref_name }}"
-
-          cat >> .github/workflows/pre-merge-checks.yaml << EOF
-
-  devplatform-security-checks:
-    permissions:
-      contents: read
-      security-events: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Run Custom Checkov Policies
-        uses: govuk-one-login/devplatform-quality-check/.github/actions/custom-checkov-policies@${REF}
-        with:
-          framework: cloudformation
-          ref: ${REF}
-EOF
-
-          git add sam-app/template.yaml .github/workflows/pre-merge-checks.yaml
+          git add sam-app/template.yaml
           git commit -m "test: trigger checkov scan for feature test run ${{ github.run_id }}"
           git push origin "$BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
@@ -69,7 +48,7 @@ EOF
             --repo govuk-one-login/devplatform-demo-sam-app \
             --title "Feature test: checkov policies #${{ github.run_id }}" \
             --body "Automated feature test from ${{ github.repository }}@${{ github.sha }}" \
-            --base main \
+            --base PSREDEV-3741 \
             --head "$BRANCH")
           echo "PR_URL=$PR_URL" >> "$GITHUB_ENV"
 
