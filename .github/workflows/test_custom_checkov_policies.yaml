@@ -17,13 +17,12 @@ jobs:
     environment: development
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout the demo sam app repo where you want to raise the PR
       - name: Checkout target repo
         uses: actions/checkout@v4
         with:
           repository: govuk-one-login/devplatform-demo-sam-app
           ref: main
-          fetch-depth: 0 # required so the action can diff against origin/main
+          fetch-depth: 0
           token: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
 
       - name: Create branch and modify CloudFormation template
@@ -36,8 +35,9 @@ jobs:
 
           echo "# feature-test-${{ github.run_id }}" >> sam-app/template.yaml
 
-          # Append a job that calls the action at the current PR branch ref
-          cat >> .github/workflows/pre-merge-checks.yaml << 'EOF'
+          REF="${{ github.head_ref || github.ref_name }}"
+
+          cat >> .github/workflows/pre-merge-checks.yaml << EOF
 
   devplatform-security-checks:
     permissions:
@@ -50,10 +50,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Custom Checkov Policies
-        uses: govuk-one-login/devplatform-quality-check/.github/actions/custom-checkov-policies@${{ github.head_ref || github.ref_name }}
+        uses: govuk-one-login/devplatform-quality-check/.github/actions/custom-checkov-policies@${REF}
         with:
           framework: cloudformation
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${REF}
 EOF
 
           git add sam-app/template.yaml .github/workflows/pre-merge-checks.yaml
@@ -81,7 +81,7 @@ EOF
             STATUS=$(gh pr checks "$PR_URL" \
               --repo govuk-one-login/devplatform-demo-sam-app \
               --json name,state \
-              --jq '.[] | select(.name | test("(?i)checkov|security")) | .state' 2>/dev/null | head -1)
+              --jq '.[] | select(.name == "devplatform-security-checks") | .state' 2>/dev/null | head -1)
             echo "Attempt $i: status=$STATUS"
             if [ "$STATUS" = "success" ]; then
               echo "Checkov check passed."
