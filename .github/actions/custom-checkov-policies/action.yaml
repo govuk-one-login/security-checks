@@ -1,4 +1,4 @@
-name: Run Custom Checkov Policy Check
+name: Run Custom Checkov Policies
 description: Runs Custom Checkov Policies on SAM/CloudFormation templates
 
 inputs:

@@ -1,0 +1,87 @@
+name: Test Custom Checkov Policies
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: test-custom-checkov-policies-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  feature-test:
+    name: Feature test against devplatform-demo-sam-app
+    environment: development
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: govuk-one-login/devplatform-demo-sam-app
+          ref: PSREDEV-3741
+          fetch-depth: 0
+          token: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
+
+      - name: Create branch and modify CloudFormation template
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="test/checkov-feature-test-${{ github.run_id }}"
+          git checkout -b "$BRANCH"
+
+          echo "# feature-test-${{ github.run_id }}" >> sam-app/template.yaml
+
+          git add sam-app/template.yaml
+          git commit -m "test: trigger checkov scan for feature test run ${{ github.run_id }}"
+          git push origin "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Raise PR on target repo
+        env:
+          GH_TOKEN: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
+        run: |
+          PR_URL=$(gh pr create \
+            --repo govuk-one-login/devplatform-demo-sam-app \
+            --title "Feature test: checkov policies #${{ github.run_id }}" \
+            --body "Automated feature test from ${{ github.repository }}@${{ github.sha }}" \
+            --base PSREDEV-3741 \
+            --head "$BRANCH")
+          echo "PR_URL=$PR_URL" >> "$GITHUB_ENV"
+
+      - name: Wait for checkov check to complete
+        env:
+          GH_TOKEN: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(gh pr checks "$PR_URL" \
+              --repo govuk-one-login/devplatform-demo-sam-app \
+              --json name,state \
+              --jq '.[] | select(.name == "devplatform-security-checks") | .state' 2>/dev/null | head -1)
+            echo "Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "success" ]; then
+              echo "Checkov check passed."
+              break
+            elif [ "$STATUS" = "failure" ]; then
+              echo "Checkov check failed."
+              exit 1
+            fi
+            sleep 30
+          done
+          if [ "$STATUS" != "success" ]; then
+            echo "Timed out waiting for checkov check."
+            exit 1
+          fi
+
+      - name: Close test PR and delete branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.DEMO_SAM_APP_SECURITY_CHECKS_TEST }}
+        run: |
+          gh pr close "$PR_URL" \
+            --repo govuk-one-login/devplatform-demo-sam-app \
+            --delete-branch \
+            --comment "Closed by automated feature test." || true
