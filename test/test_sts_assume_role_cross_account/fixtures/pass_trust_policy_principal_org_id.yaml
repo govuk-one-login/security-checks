@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Role whose trust policy permits cross-account sts:AssumeRole in line with
+  ADR 0226: scoped to the AWS organisation via aws:PrincipalOrgID, trusting an
+  explicitly named source role ARN (not a bare :root), and granting only
+  least-privilege actions.
+Parameters:
+  OrganisationId:
+    Type: String
+    Description: The aws:PrincipalOrgID of the GOV.UK One Login AWS organisation.
+Resources:
+  CrossAccountReaderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::111122223333:role/consumer-lambda-execution-role"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID: !Ref OrganisationId
+      Policies:
+        - PolicyName: least-privilege-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:GetItem"
+                  - "dynamodb:Query"
+                Resource: "arn:aws:dynamodb:eu-west-2:111122223333:table/shared-signals"

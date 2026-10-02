@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  FAIL: trust policy allows cross-account sts:AssumeRole for a named AWS
+  principal but has no aws:PrincipalOrgID condition.
+Resources:
+  UnscopedCrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::111122223333:role/consumer-lambda-execution-role"
+            Action: "sts:AssumeRole"
